@@ -1,0 +1,31 @@
+[project]
+name = "wellington-cycle-counts"
+version = "1.0.0"
+description = "Scraping Wellington cycle counts from the web"
+authors = [
+    {name = "Alexander Raichev", email = "araichev@mrcagney.com"}
+]
+readme = "README.rst"
+requires-python = ">=3.13"
+dependencies = [
+    "marimo>=0",
+    "python-dotenv>=1.0.1",
+    "loguru>=0.7.2",
+    "geopandas>=1",
+    "httpx>=0.28.1",
+    "beautifulsoup4>=4.13.5",
+    "ibis-framework[duckdb]>=10.8.0",
+]
+
+[tool.uv]
+dev-dependencies = [
+    "pre-commit-uv>=4.1.1",
+    "ruff>=0.4.10",
+]
+
+[tool.ruff]
+line-length = 90
+# Enable pycodestyle (`E`) and Pyflakes (`F`) codes by default
+lint.select = ["E", "F"]
+lint.ignore = ["E402", "E501", "F401", "F403"]
+exclude = ["**/notebooks/*.py"]
