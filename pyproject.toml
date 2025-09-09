@@ -1,7 +1,7 @@
 [project]
 name = "wellington-cycle-counts"
 version = "1.0.0"
-description = "Scraping web dat"
+description = "Scraping Wellington cycle counts from the web"
 authors = [
     {name = "Alexander Raichev", email = "araichev@mrcagney.com"}
 ]
@@ -28,4 +28,4 @@ line-length = 90
 # Enable pycodestyle (`E`) and Pyflakes (`F`) codes by default
 lint.select = ["E", "F"]
 lint.ignore = ["E402", "E501", "F401", "F403"]
-exclude = ["*.ipynb"]
+exclude = ["**/notebooks/*.py"]

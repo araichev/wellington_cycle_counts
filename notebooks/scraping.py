@@ -185,27 +185,73 @@ def _(get_dates, process_counters):
     counters = process_counters()
     counters
 
-    return counters, dates
+    return (counters,)
 
 
 @app.cell
-def _(DATA_P, counters, dates, get_counts, httpx, ib, logger):
+def _(DATA_P, counters, get_counts, httpx, ib, logger):
     # Download and save counts
-    with httpx.Client() as client:
-        for date in dates:
-            logger.info(f"Working on {date}")
-            records = []
-            for row in counters.to_pandas().itertuples():
-                year, month = [int(x) for x in date.split("-")]
-                counts = get_counts(
-                    counter_id=row.counter_id, year=year, month=month, httpx_client=client
-                )
-                records.append(counts)
 
-            counts = counters.select("counter_name", "counter_id").join(
-                ib.memtable(records), "counter_id"
-            )
-            counts.to_csv(DATA_P / f"counts_{date.replace('-', '')}.csv")
+    def download_counts(dates: list[str], tgt_dir=DATA_P) -> None:
+        """
+        Run :func:`get_counts` across all counters for the given dates (months as YYYY-MM strings)
+        and store in batches by date as CSVs in ``tgt_dir``.
+        If there are no monthly counts for a particular date, then don't save that file.
+        """
+        with httpx.Client() as client:
+            for date in dates:
+                logger.info(f"Working on {date}")
+                records = []
+                for row in counters.to_pandas().itertuples():
+                    year, month = [int(x) for x in date.split("-")]
+                    counts = get_counts(
+                        counter_id=row.counter_id, year=year, month=month, httpx_client=client
+                    )
+                    records.append(counts)
+    
+                counts = counters.select("counter_name", "counter_id").join(
+                    ib.memtable(records), "counter_id"
+                )
+                # Only save non-empty counts
+                if not counts["count_month"].isnull().execute().all():
+                    counts.to_csv(tgt_dir / f"counts_{date.replace('-', '')}.csv")
+
+    # download_counts(dates)
+    return
+
+
+@app.cell
+def _(DATA_P, ib):
+    # Collate counts
+
+
+    def collate_counts(src_dir=DATA_P, dates: list[str] | None = None) -> ib.Table:
+        """
+        Collate all the count files at ``src_dir`` and return the resulting table.
+        If optional dates are given (as YYYY-MM date strings), then only collate those counts.
+        """
+        columns = {
+            "counter_name": "string",
+            "counter_id": "string",
+            "date": "string",
+            "count_month": "int",
+            "count_weekend_avg": "float",
+            "count_weekday_avg": "float",
+        }
+        if dates:
+            paths = [src_dir / f"counts_{date}.csv" for date in dates]
+        else:
+            paths = list(src_dir.glob("counts_*.csv"))
+        return ib.union(*[ib.read_csv(p, columns=columns) for p in paths]).order_by(
+            ib.desc("date"), "counter_name"
+        )
+
+
+    counts = collate_counts()
+    d1 = counts["date"].min().execute().replace("-", "")
+    d2 = counts["date"].max().execute().replace("-", "")
+    counts.to_csv(DATA_P / f"counts_{d1}--{d2}.csv")
+    counts
     return
 
 

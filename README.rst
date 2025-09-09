@@ -1,6 +1,7 @@
 Wellington Cycle Counts
-****************************************************************************
-Scraping web dat
+***********************
+Scraping Wellington cycle counts from https://www.transportprojects.org.nz/cycle-data.
+Just one Marimo notebook at this point.
 
 Authors
 =======
@@ -16,6 +17,6 @@ Getting started
 Changelog
 =========
 
-1.0.0, YYYY-MM-DD
+1.0.0, 2025-09-10
 -----------------
 - First release.
