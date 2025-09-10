@@ -1,6 +1,6 @@
 [project]
 name = "wellington-cycle-counts"
-version = "1.0.0"
+version = "1.0.1"
 description = "Scraping Wellington cycle counts from the web"
 authors = [
     {name = "Alexander Raichev", email = "araichev@mrcagney.com"}

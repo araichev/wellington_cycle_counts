@@ -17,6 +17,10 @@ Getting started
 Changelog
 =========
 
+1.0.1, 2025-09-11
+-----------------
+- Fixed minor pipeline bugs.
+
 1.0.0, 2025-09-10
 -----------------
 - First release.
