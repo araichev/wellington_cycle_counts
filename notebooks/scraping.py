@@ -13,7 +13,7 @@ def _():
     from bs4 import BeautifulSoup
     import ibis as ib
     from ibis import _
-    from loguru import logger 
+    from loguru import logger
 
 
     ib.options.interactive = True
@@ -61,8 +61,8 @@ def _(BeautifulSoup, DATA_P, httpx, ib, json):
                 params["MarkerID"] = record["counter_id"]
                 try:
                     d = client.get(url, params=params).json()["MapData"]
-                    record["longitude"] = d["long"]
-                    record["latitude"] = d["lat"]
+                    record["longitude"] = float(d["long"])
+                    record["latitude"] = float(d["lat"])
                 except KeyError:
                     record["longitude"] = None
                     record["latitude"] = None
@@ -82,6 +82,7 @@ def _(BeautifulSoup, DATA_P, httpx, ib, json):
         ]
         return {"type": "FeatureCollection", "features": features}
 
+
     def process_counters(
         csv_path=DATA_P / "counters.csv",
         geojson_path=DATA_P / "counters.geojson",
@@ -92,8 +93,8 @@ def _(BeautifulSoup, DATA_P, httpx, ib, json):
         Get all the Wellington cycle counter data, save them to
         the given CSV and GeoJSON paths, and return the resulting table
         or, if ``as_geojson``, the (decoded) GeoJSON FeatureCollection.
-    
-        If the data already exists and not ``download_afresh``, 
+
+        If the data already exists and not ``download_afresh``,
         then just load it from the paths in the selected format.
         """
         if not csv_path.exists() or download_afresh:
@@ -109,9 +110,11 @@ def _(BeautifulSoup, DATA_P, httpx, ib, json):
         return counters
 
 
-    def get_dates(url: str = BASE_URL) -> list:
+    def get_dates(url: str = BASE_URL, first_data_date: str = "2017-12") -> list:
         """
-        Return a list of YYYY-MM datestrings of data months available.
+        Return a list of YYYY-MM datestrings of data dates available.
+        This scrapes the date dropdown at ``url`` but keeps only the dates since
+        ``first_data_date``.
         """
         html = httpx.get(url).text
         soup = BeautifulSoup(html, "html.parser")
@@ -120,7 +123,8 @@ def _(BeautifulSoup, DATA_P, httpx, ib, json):
             date = (opt.get("value") or "").strip()
             if not date:
                 continue
-            results.append(date[:7])
+            elif date >= first_data_date:
+                results.append(date[:7])
 
         return sorted(set(results))[::-1]
 
@@ -142,17 +146,17 @@ def _(BeautifulSoup, DATA_P, httpx, ib, json):
             client = httpx_client
 
         result = dict(
-            counter_id=counter_id, 
-            date=f"{year}-{month:02d}",  
+            counter_id=counter_id,
+            date=f"{year}-{month:02d}",
             count_month=None,
-            count_weekday_avg=None, 
+            count_weekday_avg=None,
             count_weekend_avg=None,
         )
         try:
             html = client.get(url, params=params).raise_for_status().json()["HTML"]
         except Exception:
             return result
-                
+
         soup = BeautifulSoup(html, "html.parser")
 
         # Month count
@@ -164,7 +168,9 @@ def _(BeautifulSoup, DATA_P, httpx, ib, json):
         result["count_month"] = count
 
         # Daily averages
-        els = soup.select("div.cycle-data__column div.cycle-data__figure p.cycle-data__figure-number")
+        els = soup.select(
+            "div.cycle-data__column div.cycle-data__figure p.cycle-data__figure-number"
+        )
         if els:
             wda = int(els[-2].string.replace(",", ""))
             wea = int(els[-1].string.replace(",", ""))
@@ -174,23 +180,22 @@ def _(BeautifulSoup, DATA_P, httpx, ib, json):
         result["count_weekend_avg"] = wea
 
         return result
-    
     return get_counts, get_dates, process_counters
 
 
 @app.cell
 def _(get_dates, process_counters):
     dates = get_dates()
-    print(dates) 
+    print(dates)
     counters = process_counters()
     counters
-
     return (counters,)
 
 
 @app.cell
 def _(DATA_P, counters, get_counts, httpx, ib, logger):
     # Download and save counts
+
 
     def download_counts(dates: list[str], tgt_dir=DATA_P) -> None:
         """
@@ -205,16 +210,20 @@ def _(DATA_P, counters, get_counts, httpx, ib, logger):
                 for row in counters.to_pandas().itertuples():
                     year, month = [int(x) for x in date.split("-")]
                     counts = get_counts(
-                        counter_id=row.counter_id, year=year, month=month, httpx_client=client
+                        counter_id=row.counter_id,
+                        year=year,
+                        month=month,
+                        httpx_client=client,
                     )
                     records.append(counts)
-    
+
                 counts = counters.select("counter_name", "counter_id").join(
                     ib.memtable(records), "counter_id"
                 )
                 # Only save non-empty counts
                 if not counts["count_month"].isnull().execute().all():
                     counts.to_csv(tgt_dir / f"counts_{date.replace('-', '')}.csv")
+
 
     # download_counts(dates)
     return
@@ -241,7 +250,7 @@ def _(DATA_P, ib):
         if dates:
             paths = [src_dir / f"counts_{date}.csv" for date in dates]
         else:
-            paths = list(src_dir.glob("counts_*.csv"))
+            paths = list(src_dir.glob("counts_[0-9][0-9][0-9][0-9][0-9][0-9].csv"))
         return ib.union(*[ib.read_csv(p, columns=columns) for p in paths]).order_by(
             ib.desc("date"), "counter_name"
         )
